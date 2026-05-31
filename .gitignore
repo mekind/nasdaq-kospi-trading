@@ -1,0 +1,37 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# --- Node / TypeScript ---
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# --- Env / secrets ---
+.env
+.env.local
+*.local
+
+# --- Data / logs ---
+data/
+*.csv
+*.parquet
+logs/
+*.log
+
+# --- OMC tooling state ---
+.omc/
+
+# --- OS / editor ---
+.DS_Store
+.idea/
+.vscode/
