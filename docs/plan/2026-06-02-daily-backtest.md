@@ -42,6 +42,53 @@ FDR로 069500 일봉 fetch → parquet 캐시
   → 성과 지표 + 자산곡선 + 거래내역 출력(CSV) + 폭락구간 분석
 ```
 
+## 파일별 역할
+
+| 파일 | 신규/수정 | 역할 |
+|------|-----------|------|
+| `data/fdr_provider.py` | 신규 | FinanceDataReader로 일봉 OHLCV를 받아오고 로컬 parquet으로 캐시. 재실행 시 네트워크 없이 빠르게 로드. `MarketDataProvider` 인터페이스 구현. |
+| `indicators.py` | 신규 | 순수 기술적 지표 함수 모음. `rsi(series, period)`, `sma(series, window)`. 상태 없는 pandas Series 변환 함수라 단위 테스트·재사용 용이. |
+| `strategy/base.py` | 수정 | DataFrame을 받아 `signal` 컬럼(buy/sell/hold)을 산출하는 시그널 생성 인터페이스 추가. 모든 전략의 공통 계약. |
+| `strategy/mean_reversion.py` | 신규 | 검증 대상 전략 구현. `indicators`로 RSI(2)·200일선·5일선 계산 후 진입/청산 규칙을 적용해 시그널 생성. |
+| `backtest/costs.py` | 신규 | 수수료·증권거래세·슬리피지 비용 모델. 매수/매도 체결 비용을 계산. ETF 거래세 면제 등 파라미터화. |
+| `backtest/engine.py` | 수정 | placeholder → 이벤트 기반 백테스트 엔진. 시그널 컬럼을 일별 순회하며 next-bar 체결·포지션·손익을 시뮬레이션하고 `costs`로 비용 차감. 거래내역·자산곡선 산출. |
+| `backtest/metrics.py` | 신규 | 자산곡선·거래내역 → 성과 지표(총수익률·CAGR·기대값·MDD·샤프·승률) 및 폭락 구간 분석. |
+| `backtest/run.py` | 신규 | CLI 진입점. provider→strategy→engine→metrics를 연결하고 결과를 콘솔/CSV로 출력하는 오케스트레이터. |
+| `tests/test_backtest.py` | 신규 | 합성 데이터로 엔진·비용 계산의 정확성을 검증하는 단위 테스트. |
+
+## 구조도
+
+```mermaid
+flowchart TD
+    CLI["backtest/run.py<br/>CLI 오케스트레이터"]
+    FDR["data/fdr_provider.py<br/>일봉 로더 + 캐시"]
+    IND["indicators.py<br/>rsi(), sma()"]
+    BASE["strategy/base.py<br/>시그널 인터페이스"]
+    STRAT["strategy/mean_reversion.py<br/>전략 규칙"]
+    ENGINE["backtest/engine.py<br/>이벤트 기반 엔진"]
+    COSTS["backtest/costs.py<br/>비용 모델"]
+    METRICS["backtest/metrics.py<br/>성과 지표 + 폭락 분석"]
+    OUT(["출력: 콘솔 요약<br/>equity_curve.csv, trades.csv"])
+    TEST["tests/test_backtest.py<br/>단위 테스트"]
+
+    CLI --> FDR
+    CLI --> STRAT
+    CLI --> ENGINE
+    CLI --> METRICS
+
+    FDR -->|"OHLCV DataFrame"| STRAT
+    IND --> STRAT
+    BASE -.->|"인터페이스 구현"| STRAT
+    STRAT -->|"signal 컬럼"| ENGINE
+    COSTS --> ENGINE
+    ENGINE -->|"거래내역 · 자산곡선"| METRICS
+    METRICS --> OUT
+    ENGINE --> OUT
+
+    TEST -.->|"검증"| ENGINE
+    TEST -.->|"검증"| COSTS
+```
+
 ## 핵심 설계 결정 (이유 포함)
 
 1. **룩어헤드 편향 차단**: 시그널은 당일 종가로 계산하되, **체결은 다음 거래일 시가(next-bar open)**로.
