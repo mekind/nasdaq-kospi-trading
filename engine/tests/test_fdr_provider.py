@@ -85,3 +85,18 @@ def test_index_sorted_ascending(monkeypatch):
 
     assert isinstance(df.index, pd.DatetimeIndex)
     assert df.index.is_monotonic_increasing
+
+
+def test_empty_data_not_cached(monkeypatch, tmp_path):
+    """fetch 결과가 빈 데이터면 캐시 파일을 저장하지 않는다(불완전 캐시 오염 방지)."""
+    empty = pd.DataFrame(
+        {"Open": [], "High": [], "Low": [], "Close": [], "Volume": []}
+    )
+    monkeypatch.setattr(fdr_provider.fdr, "DataReader", lambda *a, **k: empty)
+
+    provider = FdrProvider(cache_dir=str(tmp_path))
+    out = provider.load_daily("DEAD", start="2014-01-01", use_cache=True)
+
+    assert len(out) == 0
+    # 빈 데이터는 캐시에 남지 않아야 함
+    assert list(tmp_path.iterdir()) == []
