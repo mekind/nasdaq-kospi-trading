@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     alpaca_api_secret: str = ""
     alpaca_base_url: str = "https://paper-api.alpaca.markets"
 
+    # DART OpenAPI (금융감독원 전자공시) — KOSPI 실적/재무
+    dart_api_key: str = ""
+
     # Engine API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
