@@ -22,7 +22,9 @@ dist/
 *.local
 
 # --- Data / logs ---
-data/
+# 시세 데이터 캐시·산출물만 무시 (소스 패키지 src/.../data/ 는 추적해야 함)
+**/data/cache/
+output/
 *.csv
 *.parquet
 logs/
