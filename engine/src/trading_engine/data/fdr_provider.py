@@ -68,8 +68,14 @@ class FdrProvider:
         # dtype 강제 float 변환
         df = df.astype(float)
 
-        # close가 NaN인 행 제거
-        df = df.dropna(subset=["close"])
+        # 거래량 결측은 0으로 채움 (체결 시뮬레이션에 영향 없음).
+        df["volume"] = df["volume"].fillna(0.0)
+
+        # OHLC 중 하나라도 결측인 봉은 제거.
+        # 백테스트 엔진은 next-bar 시가(open)로 체결하므로 open/high/low/close가 모두 필요하다.
+        # 장기 지수(예: KS200) 선두 구간은 '종가만' 존재하는 경우가 있어, 이를 남겨두면
+        # 체결가가 NaN이 되어 포지션·자산곡선 전체가 NaN으로 오염된다(룩어헤드 아닌 데이터 결측 버그).
+        df = df.dropna(subset=["open", "high", "low", "close"])
 
         # 인덱스를 DatetimeIndex로 보장 후 오름차순 정렬
         df.index = pd.to_datetime(df.index)
