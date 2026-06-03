@@ -98,6 +98,41 @@ def caar(
     return out
 
 
+def compute_event_cars(
+    events: list[EarningsEvent],
+    price_map: dict[str, pd.Series],
+    market_close: pd.Series,
+    horizons: tuple[int, ...] = DEFAULT_HORIZONS,
+) -> list[tuple[EarningsEvent, dict[int, float | None]]]:
+    """신호와 무관하게 **모든 유효 이벤트의 CAR을 한 번** 계산해 둔다.
+
+    스윕(여러 신호 설정 비교) 시 이벤트별 CAR을 재계산하지 않도록 분리한 함수.
+    종목별 초과수익 시계열은 1회만 계산해 캐시한다.
+    """
+    abn_cache: dict[str, pd.Series] = {}
+    out: list[tuple[EarningsEvent, dict[int, float | None]]] = []
+    for ev in events:
+        if ev.avail_date is None:
+            continue
+        close = price_map.get(ev.stock_code)
+        if close is None:
+            continue
+        if ev.stock_code not in abn_cache:
+            abn_cache[ev.stock_code] = abnormal_returns(close, market_close)
+        out.append((ev, car_for_event(abn_cache[ev.stock_code], ev.avail_date, horizons)))
+    return out
+
+
+def caar_for_signal(
+    event_cars: list[tuple[EarningsEvent, dict[int, float | None]]],
+    signal_fn,
+    horizons: tuple[int, ...] = DEFAULT_HORIZONS,
+) -> dict[int, CaarStat]:
+    """사전 계산된 (event, CAR) 목록에서 signal 통과분만 모아 CAAR 산출."""
+    cars = [c for ev, c in event_cars if signal_fn(ev)]
+    return caar(cars, horizons)
+
+
 def run_event_study(
     events: list[EarningsEvent],
     price_map: dict[str, pd.Series],
@@ -137,5 +172,29 @@ def eps_yoy_signal(threshold: float = 0.20):
     def _fn(ev: EarningsEvent) -> bool:
         v = ev.yoy.get("eps")
         return v is not None and v >= threshold
+
+    return _fn
+
+
+def composite_yoy_signal(specs: tuple[tuple[str, float], ...], mode: str = "all"):
+    """복합 YoY 신호 팩토리.
+
+    Parameters
+    ----------
+    specs:
+        ``((field, threshold), ...)`` 예: ``(("eps", 0.2), ("revenue", 0.0))``.
+        field ∈ {revenue, operating_income, net_income, eps}.
+    mode:
+        ``"all"`` 모든 조건 충족 / ``"any"`` 하나라도 충족. None 값은 미충족 취급.
+    """
+    if mode not in ("all", "any"):
+        raise ValueError("mode must be 'all' or 'any'")
+
+    def _fn(ev: EarningsEvent) -> bool:
+        results = []
+        for field, th in specs:
+            v = ev.yoy.get(field)
+            results.append(v is not None and v >= th)
+        return all(results) if mode == "all" else any(results)
 
     return _fn

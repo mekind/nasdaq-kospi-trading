@@ -7,7 +7,10 @@ from .event_study import (
     CaarStat,
     abnormal_returns,
     caar,
+    caar_for_signal,
     car_for_event,
+    composite_yoy_signal,
+    compute_event_cars,
     eps_yoy_signal,
     run_event_study,
 )
@@ -21,7 +24,10 @@ __all__ = [
     "CaarStat",
     "abnormal_returns",
     "caar",
+    "caar_for_signal",
     "car_for_event",
+    "composite_yoy_signal",
+    "compute_event_cars",
     "eps_yoy_signal",
     "run_event_study",
 ]

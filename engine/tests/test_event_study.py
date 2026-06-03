@@ -10,7 +10,10 @@ import pytest
 from trading_engine.backtest.event_study import (
     abnormal_returns,
     caar,
+    caar_for_signal,
     car_for_event,
+    composite_yoy_signal,
+    compute_event_cars,
     eps_yoy_signal,
     run_event_study,
 )
@@ -140,6 +143,48 @@ def test_run_event_study_filters_and_aggregates():
     # 양의 초과수익 → 양의 CAAR
     assert out[5].caar > 0
     assert out[20].caar > out[5].caar  # 드리프트 지속 → 더 긴 지평선이 더 큼
+
+
+def _event_multi(stock_code, yoy_map, avail):
+    fig = FinancialFigures()
+    ev = EarningsEvent(
+        stock_code=stock_code, corp_code="C", rcept_no="R", rcept_dt="20230814",
+        bsns_year=2023, reprt_code="11012", is_amendment=False, figures=fig, avail_date=avail,
+    )
+    ev.yoy.update(yoy_map)
+    return ev
+
+
+def test_composite_yoy_signal_all_and_any():
+    ev = _event_multi("A", {"eps": 0.3, "revenue": 0.05, "net_income": -0.1}, None)
+    # all: eps≥0.2 AND revenue≥0.0 → True
+    assert composite_yoy_signal((("eps", 0.2), ("revenue", 0.0)), "all")(ev) is True
+    # all: net_income≥0.0 실패 → False
+    assert composite_yoy_signal((("eps", 0.2), ("net_income", 0.0)), "all")(ev) is False
+    # any: 하나라도 충족 → True
+    assert composite_yoy_signal((("net_income", 0.0), ("eps", 0.2)), "any")(ev) is True
+
+
+def test_composite_yoy_signal_bad_mode():
+    with pytest.raises(ValueError):
+        composite_yoy_signal((("eps", 0.2),), "xor")
+
+
+def test_compute_event_cars_and_caar_for_signal():
+    idx = _dates(60)
+    market = pd.Series(100.0, index=idx)
+    stock = pd.Series((1.004 ** pd.Series(range(60))).values * 100, index=idx)
+    entry = idx[10]
+    events = [
+        _event_multi("A", {"eps": 0.3}, entry),  # 시그널 통과
+        _event_multi("A", {"eps": 0.0}, entry),  # 미달
+        _event_multi("A", {"eps": 0.3}, None),  # avail 없음 → 제외
+    ]
+    pairs = compute_event_cars(events, {"A": stock}, market, horizons=(5,))
+    assert len(pairs) == 2  # avail 없는 건 제외
+    out = caar_for_signal(pairs, eps_yoy_signal(0.2), horizons=(5,))
+    assert out[5].n == 1  # eps 0.3만 통과
+    assert out[5].caar > 0
 
 
 def test_run_event_study_skips_missing_price_and_no_avail():
