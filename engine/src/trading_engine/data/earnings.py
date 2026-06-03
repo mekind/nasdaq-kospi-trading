@@ -86,14 +86,30 @@ class FinancialFigures:
     prior_eps: float | None = None
 
 
+def prior_field_for(reprt_code: str) -> str:
+    """보고서 코드에 맞는 전년동기 금액 컬럼명.
+
+    분기/반기 보고서는 ``frmtrm_q_amount``(전기 동기 3개월), 사업보고서(연간)는
+    분기 컬럼이 없으므로 ``frmtrm_amount``(전기 연간)를 쓴다.
+    (라이브 검증: 삼성전자 2023 반기 thstrm=당기3개월, frmtrm_q=전년동기3개월으로 동일기간 YoY 성립)
+    """
+    from trading_engine.data.dart_provider import REPRT_ANNUAL
+
+    return "frmtrm_amount" if reprt_code == REPRT_ANNUAL else "frmtrm_q_amount"
+
+
 def extract_figures(fs_df: pd.DataFrame, prior_field: str = "frmtrm_q_amount") -> FinancialFigures:
     """fnlttSinglAcntAll 계정 행 DataFrame에서 핵심 수치를 추출.
+
+    ``thstrm_amount`` 는 손익계산서 기준 **당기 3개월**(분기/반기 보고서) 금액이며,
+    누적은 ``thstrm_add_amount`` 에 별도로 있다. YoY는 동일 기간(3개월) 비교를 위해
+    ``thstrm_amount`` vs ``prior_field`` 를 사용한다.
 
     Parameters
     ----------
     prior_field:
-        전년동기 금액 컬럼. 분기보고서는 ``"frmtrm_q_amount"``(전기동분기),
-        사업보고서는 ``"frmtrm_amount"``(전기) 사용.
+        전년동기 금액 컬럼. 분기/반기는 ``"frmtrm_q_amount"``(전기 동기 3개월),
+        사업보고서는 ``"frmtrm_amount"``(전기 연간). ``prior_field_for()`` 참조.
     """
     fig = FinancialFigures()
     for key, spec in ACCOUNT_SPECS.items():

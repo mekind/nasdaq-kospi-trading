@@ -34,9 +34,11 @@ DART 무료 키를 받기 전 단계로, **라이브 호출이 필요 없는 부
 
 **검증 증거**: `./.venv/bin/python -m pytest -q` → `86 passed`. ruff `All checks passed!`.
 
-**남은 라이브 검증(키 수령 후)**: 상폐 종목 실제 재무 반환 / `frmtrm_q_amount` 일관성 / EPS account_id 태그명. → research 문서 잔여 3건.
+**라이브 검증 완료(2026-06-03, 005930)**: 응답 스키마·YoY 정합성(thstrm=3개월 vs frmtrm_q=전년동기3개월)·EPS 태그(`ifrs-full_BasicEarningsLossPerShare`)·접수일·corp_code 규모(118,224건) 모두 확정. 삼성 2023 메모리 불황(매출 −22%, EPS −86%) 실측으로 sanity check 통과. `prior_field_for()` 헬퍼 추가(분기→frmtrm_q, 연간→frmtrm). 상세는 `07-dart-data-availability.md`.
 
-**다음**: 키 수령 → 라이브 스모크 1종목(예: 005930) → Phase 2(모드 A 이벤트 스터디 CAAR).
+**⚠️ 상폐 매핑 과제**: 상폐사는 corpCode.xml에서 stock_code가 빈값 → 재무는 corp_code로 조회 가능하나 "과거 KOSPI 종목" 식별엔 외부 상폐목록(KRX/KIND) 필요. Phase 2 PIT 유니버스에서 처리.
+
+**다음**: Phase 2 — 모드 A 이벤트 스터디(CAAR)로 알파 존재 검증.
 
 ## 목표
 

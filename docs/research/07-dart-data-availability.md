@@ -57,17 +57,26 @@ DART OpenAPI는 **무료**로 분기 재무(매출·영업이익·순이익·EPS
 
 ---
 
-## 남은 블로커 (라이브 검증 미완)
+## 라이브 검증 결과 (2026-06-03, 삼성전자 005930)
 
-문서 조사는 완료했으나, **실제 응답 스키마·상폐 종목 실데이터 확인은 라이브 호출이 필요**하며 현재 막혀 있다:
+키 수령 후 라이브 스모크로 잔여 질문을 **모두 확정**했다 (`./engine/.venv/bin/python` 실행):
 
-1. **DART API 키 없음** — 무료 발급 필요: opendart.fss.or.kr 회원가입 → 이메일 인증 → 인증키 신청. (사용자 조치 필요)
-2. **Python 엔진 환경 미설치** — `engine/`에서 `python -m venv .venv && pip install -e ".[dev]"` 필요. (Phase 1 착수 시 셋업)
+- ✅ **응답 스키마 확정** — `fnlttSinglAcntAll` 컬럼: `rcept_no, reprt_code, sj_div, account_id, account_nm, thstrm_nm, thstrm_amount, frmtrm_nm, frmtrm_amount, thstrm_add_amount, frmtrm_q_nm, frmtrm_q_amount, ...`
+- ✅ **YoY 정합성** — 2023 반기: `thstrm_amount`=당기 **3개월**(매출 60.0조), `frmtrm_q_amount`=전년 동기 3개월(77.2조). 누적은 `thstrm_add_amount`에 별도. → 동일 기간(3개월) YoY 성립. (삼성 2023 메모리 불황: 매출 −22%, EPS 228 vs 1613 ≈ −86% 실측)
+- ✅ **EPS XBRL 태그** — `ifrs-full_BasicEarningsLossPerShare`("기본주당이익(손실)"). 희석은 `ifrs-full_DilutedEarningsLossPerShare`.
+- ✅ **접수일(PIT)** — 2023 반기보고서 접수일 `20230814`(공시검색 list.json), 정정 없음.
+- ✅ **corp_code 규모** — 총 118,224건 중 stock_code 빈값 114,257건. 상폐/비상장 corp_code가 보존됨.
 
-**라이브로 확정해야 할 잔여 질문** (키 확보 후 Phase 1 초입에):
-- [ ] 상폐 종목 1개(예: 과거 상폐기업)의 `fnlttSinglAcntAll`이 폐지 전 분기재무를 실제 반환하는가
-- [ ] `frmtrm_q_amount`(전기동분기)가 분기보고서에서 일관 채워지는가
-- [ ] EPS account_id의 정확한 XBRL 태그명(기본주당이익) 확인
+### ⚠️ 상폐 종목 매핑 뉘앙스 (Phase 2 유니버스 과제)
+corpCode.xml에서 **상장폐지사는 stock_code가 빈값**으로 나온다(현재 상장사만 6자리 코드 보유). 즉:
+- 상폐사 재무는 corp_code로 조회 가능(생존편향 회피 가능) ✅
+- 그러나 "이 corp_code가 과거 KOSPI 종목이었다"를 알려면 **외부 과거 상장종목 매핑(KRX/KIND 상장폐지 목록)** 이 필요하다. corpCode.xml만으로는 현재 상장사(survivor)만 종목코드로 식별됨.
+- → Phase 2 모드 A/B의 **point-in-time 유니버스 구성**에서 별도 처리(상폐 목록 확보). 미확보 시 결과에 "생존편향 낙관" 한계 명시.
+
+### 잔여 (해소됨 / 환경)
+- ~~상폐 종목 실재무 반환~~ → corp_code 존재 시 가능 확인(stock_code 매핑은 위 과제)
+- ~~frmtrm_q 일관성~~ / ~~EPS 태그명~~ → 확정
+- Python 엔진 환경: `engine/.venv` 셋업 완료, 전체 테스트 87 passed.
 
 ---
 

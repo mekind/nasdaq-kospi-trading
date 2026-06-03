@@ -9,6 +9,7 @@ from .earnings import (
     availability_date,
     extract_figures,
     first_filings_only,
+    prior_field_for,
     yoy,
 )
 
@@ -23,5 +24,6 @@ __all__ = [
     "availability_date",
     "extract_figures",
     "first_filings_only",
+    "prior_field_for",
     "yoy",
 ]

@@ -22,6 +22,7 @@ from trading_engine.data.earnings import (
     availability_date,
     extract_figures,
     first_filings_only,
+    prior_field_for,
     yoy,
 )
 
@@ -107,6 +108,14 @@ def test_extract_figures_annual_prior_field():
     fig = extract_figures(_fs_rows_by_id(), prior_field="frmtrm_amount")
     assert fig.prior_revenue == 900.0
     assert fig.prior_eps == 800.0
+
+
+def test_prior_field_for():
+    # 분기/반기는 전기동분기, 사업보고서(연간)는 전기
+    assert prior_field_for(dp.REPRT_Q1) == "frmtrm_q_amount"
+    assert prior_field_for(dp.REPRT_HALF) == "frmtrm_q_amount"
+    assert prior_field_for(dp.REPRT_Q3) == "frmtrm_q_amount"
+    assert prior_field_for(dp.REPRT_ANNUAL) == "frmtrm_amount"
 
 
 # ── _to_float 엣지 ──────────────────────────────────────────────────────────
