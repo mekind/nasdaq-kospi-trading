@@ -81,8 +81,10 @@ class FdrProvider:
         df.index = pd.to_datetime(df.index)
         df = df.sort_index(ascending=True)
 
-        # 캐시 저장
-        if use_cache:
+        # 캐시 저장 — 단, **빈 데이터는 저장하지 않는다**(불완전 캐시 오염 방지).
+        # 다수 종목 일괄 수집 시, 실패/상폐로 0행이 나온 종목을 캐시에 남기면
+        # 이후 실행이 그 빈 캐시를 무비용 재사용하며 조용히 잘못된 결과를 낸다.
+        if use_cache and len(df) > 0:
             os.makedirs(self.cache_dir, exist_ok=True)
             df.to_parquet(cache_path, engine="pyarrow")
 
