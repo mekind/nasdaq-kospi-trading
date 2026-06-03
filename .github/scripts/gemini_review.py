@@ -8,7 +8,7 @@ PR diff를 읽어 Google Gemini API(무료 티어)로 리뷰를 생성하고,
 
 환경변수:
   GEMINI_API_KEY  (필수) Google AI Studio 발급 키. 없으면 스킵(exit 0).
-  GEMINI_MODEL    (선택) 기본 'gemini-2.0-flash'.
+  GEMINI_MODEL    (선택) 기본 'gemini-2.5-flash-lite'.
   REVIEW_OUT      (선택) 리뷰 마크다운 저장 경로. 기본 'gemini-review.md'.
 
 인자:
@@ -71,7 +71,7 @@ def main() -> int:
     if truncated:
         diff = diff[:MAX_DIFF_CHARS]
 
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite").strip()
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:generateContent?key={api_key}"

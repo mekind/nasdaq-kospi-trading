@@ -29,7 +29,7 @@ PR opened/synchronize
 
 1. **자작 스크립트** (서드파티 액션 미사용): 공급망 위험을 줄이고 동작을 완전히 감사 가능하게. 의존성 없이 `urllib`만 사용 → CI에서 pip 설치 불필요.
 2. **트리거**: `opened`, `synchronize`, `reopened`. 푸시마다 새 리뷰 코멘트를 남긴다(v1은 단순; 추후 sticky 코멘트로 갱신 가능).
-3. **모델**: 기본 `gemini-2.0-flash`(무료 티어). `GEMINI_MODEL` 환경변수로 교체 가능.
+3. **모델**: 기본 `gemini-2.5-flash-lite`(무료 티어). `GEMINI_MODEL` 환경변수로 교체 가능. (구 `gemini-2.0-flash`는 2026-06-01 종료되어 교체함)
 4. **안전한 스킵**: `GEMINI_API_KEY` 시크릿이 없거나 diff가 비면 조용히 스킵(exit 0) → 시크릿 등록 전에도 CI가 깨지지 않음. Gemini 오류도 CI를 실패시키지 않음(리뷰는 보조 기능).
 5. **diff 크기 제한**: 120k자 초과 시 잘라서 호출(토큰/무료 한도 보호), 잘렸음을 코멘트에 명시.
 6. **권한 최소화**: `contents: read`, `pull-requests: write` 만.

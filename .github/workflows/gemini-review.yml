@@ -28,7 +28,7 @@ jobs:
       - name: Generate Gemini review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-2.0-flash
+          GEMINI_MODEL: gemini-2.5-flash-lite
           REVIEW_OUT: gemini-review.md
         run: python .github/scripts/gemini_review.py pr.diff
 
