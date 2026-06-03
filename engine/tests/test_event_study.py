@@ -15,6 +15,7 @@ from trading_engine.backtest.event_study import (
     composite_yoy_signal,
     compute_event_cars,
     eps_yoy_signal,
+    growth_gap_signal,
     run_event_study,
 )
 from trading_engine.data.earnings import EarningsEvent, FinancialFigures
@@ -168,6 +169,25 @@ def test_composite_yoy_signal_all_and_any():
 def test_composite_yoy_signal_bad_mode():
     with pytest.raises(ValueError):
         composite_yoy_signal((("eps", 0.2),), "xor")
+
+
+def test_growth_gap_signal():
+    sig = growth_gap_signal(0.20, "eps")
+    # 이익 +50%, 주가 +10% → 갭 40% ≥ 20% → 통과
+    ev1 = _event_multi("A", {"eps": 0.50}, None)
+    ev1.price_yoy = 0.10
+    assert sig(ev1) is True
+    # 이익 +30%, 주가 +25% → 갭 5% < 20% → 미달
+    ev2 = _event_multi("A", {"eps": 0.30}, None)
+    ev2.price_yoy = 0.25
+    assert sig(ev2) is False
+    # 이익 음수 → 성장 아님 → 미달 (갭이 커도)
+    ev3 = _event_multi("A", {"eps": -0.10}, None)
+    ev3.price_yoy = -0.90
+    assert sig(ev3) is False
+    # price_yoy None → 판정 불가 → 미달
+    ev4 = _event_multi("A", {"eps": 0.50}, None)
+    assert sig(ev4) is False
 
 
 def test_compute_event_cars_and_caar_for_signal():

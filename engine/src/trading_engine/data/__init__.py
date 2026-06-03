@@ -10,6 +10,7 @@ from .earnings import (
     extract_figures,
     first_filings_only,
     prior_field_for,
+    trailing_return,
     yoy,
 )
 
@@ -25,5 +26,6 @@ __all__ = [
     "extract_figures",
     "first_filings_only",
     "prior_field_for",
+    "trailing_return",
     "yoy",
 ]

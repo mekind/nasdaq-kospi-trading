@@ -155,6 +155,8 @@ class EarningsEvent:
     is_amendment: bool
     figures: FinancialFigures
     avail_date: pd.Timestamp | None = None  # 접수일 다음 거래일 (PIT 가용일)
+    # 접수일까지의 과거 주가 수익률(PIT). 이익성장 대비 주가가 덜 올랐는지(갭) 판단용.
+    price_yoy: float | None = None
     yoy: dict[str, float | None] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -179,6 +181,24 @@ def availability_date(rcept_dt: str, trading_index: pd.DatetimeIndex) -> pd.Time
     # 접수일보다 '엄격히 큰' 첫 거래일
     later = trading_index[trading_index > rcept_ts]
     return None if len(later) == 0 else later[0]
+
+
+def trailing_return(close: pd.Series, asof: pd.Timestamp, lookback: int = 252) -> float | None:
+    """``asof`` 시점까지의 과거 ``lookback`` 거래일 가격 수익률 (PIT).
+
+    이익 성장률(YoY, 1년 비교)과 견주기 위해 기본 252거래일(≈1년) 수익률을 쓴다.
+    asof 이후 데이터는 절대 보지 않는다(룩어헤드 차단). 데이터 부족 시 None.
+    """
+    if close is None or len(close) == 0:
+        return None
+    upto = close.loc[close.index <= asof]
+    if len(upto) <= lookback:
+        return None
+    end = float(upto.iloc[-1])
+    start = float(upto.iloc[-1 - lookback])
+    if start <= 0:
+        return None
+    return end / start - 1.0
 
 
 def first_filings_only(disclosures: pd.DataFrame) -> pd.DataFrame:

@@ -23,6 +23,7 @@ from trading_engine.data.earnings import (
     extract_figures,
     first_filings_only,
     prior_field_for,
+    trailing_return,
     yoy,
 )
 
@@ -108,6 +109,33 @@ def test_extract_figures_annual_prior_field():
     fig = extract_figures(_fs_rows_by_id(), prior_field="frmtrm_amount")
     assert fig.prior_revenue == 900.0
     assert fig.prior_eps == 800.0
+
+
+def test_trailing_return_pit():
+    idx = pd.bdate_range("2022-01-03", periods=300)
+    close = pd.Series(range(100, 400), index=idx, dtype=float)  # 단조 증가
+    asof = idx[260]
+    r = trailing_return(close, asof, lookback=252)
+    end = float(close.iloc[260])
+    start = float(close.iloc[260 - 252])
+    assert r == pytest.approx(end / start - 1.0)
+
+
+def test_trailing_return_ignores_future():
+    idx = pd.bdate_range("2022-01-03", periods=300)
+    close = pd.Series(range(100, 400), index=idx, dtype=float)
+    asof = idx[260]
+    # asof 이후 값을 바꿔도 결과 불변(룩어헤드 없음)
+    r1 = trailing_return(close, asof, 252)
+    close.iloc[261:] = 99999.0
+    r2 = trailing_return(close, asof, 252)
+    assert r1 == r2
+
+
+def test_trailing_return_insufficient():
+    idx = pd.bdate_range("2022-01-03", periods=100)
+    close = pd.Series(range(100, 200), index=idx, dtype=float)
+    assert trailing_return(close, idx[50], lookback=252) is None
 
 
 def test_prior_field_for():

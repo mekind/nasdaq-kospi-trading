@@ -176,6 +176,23 @@ def eps_yoy_signal(threshold: float = 0.20):
     return _fn
 
 
+def growth_gap_signal(threshold: float = 0.20, growth_field: str = "eps"):
+    """이익 성장률 − 주가 상승률 갭 ≥ threshold 인 이벤트만 통과.
+
+    "이익은 늘었는데(growth>0) 주가가 덜 올라(gap 큼)" 따라잡기를 노리는 신호.
+    ``ev.price_yoy`` (접수일까지의 과거 수익률, PIT)와 ``ev.yoy[growth_field]`` 비교.
+    """
+
+    def _fn(ev: EarningsEvent) -> bool:
+        g_e = ev.yoy.get(growth_field)
+        g_p = ev.price_yoy
+        if g_e is None or g_p is None:
+            return False
+        return g_e > 0 and (g_e - g_p) >= threshold
+
+    return _fn
+
+
 def composite_yoy_signal(specs: tuple[tuple[str, float], ...], mode: str = "all"):
     """복합 YoY 신호 팩토리.
 
