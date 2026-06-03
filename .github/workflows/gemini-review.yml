@@ -25,15 +25,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh pr diff ${{ github.event.pull_request.number }} > pr.diff
 
-      - name: Generate Gemini review
+      - name: Multi-role Gemini review (posts sticky comments per role)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-2.5-flash-lite
-          REVIEW_OUT: gemini-review.md
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: python .github/scripts/gemini_review.py pr.diff
-
-      - name: Post review comment
-        if: ${{ hashFiles('gemini-review.md') != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr comment ${{ github.event.pull_request.number }} --body-file gemini-review.md
