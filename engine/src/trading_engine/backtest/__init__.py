@@ -14,6 +14,7 @@ from .event_study import (
     eps_yoy_signal,
     growth_gap_signal,
     run_event_study,
+    sue_signal,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "eps_yoy_signal",
     "growth_gap_signal",
     "run_event_study",
+    "sue_signal",
 ]

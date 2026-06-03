@@ -157,6 +157,8 @@ class EarningsEvent:
     avail_date: pd.Timestamp | None = None  # 접수일 다음 거래일 (PIT 가용일)
     # 접수일까지의 과거 주가 수익률(PIT). 이익성장 대비 주가가 덜 올랐는지(갭) 판단용.
     price_yoy: float | None = None
+    # 표준화 기대외이익(SUE). 정통 PEAD 신호 — 기대(계절 랜덤워크) 대비 서프라이즈 크기.
+    sue: float | None = None
     yoy: dict[str, float | None] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -199,6 +201,93 @@ def trailing_return(close: pd.Series, asof: pd.Timestamp, lookback: int = 252) -
     if start <= 0:
         return None
     return end / start - 1.0
+
+
+def quarter_of(reprt_code: str) -> int | None:
+    """보고서 코드 → 회계분기 번호(1~4). 사업보고서(연간)는 4분기로 본다."""
+    from trading_engine.data.dart_provider import (
+        REPRT_ANNUAL,
+        REPRT_HALF,
+        REPRT_Q1,
+        REPRT_Q3,
+    )
+
+    return {REPRT_Q1: 1, REPRT_HALF: 2, REPRT_Q3: 3, REPRT_ANNUAL: 4}.get(reprt_code)
+
+
+def build_quarterly_ni(events: list[EarningsEvent]) -> dict[tuple[int, int], float]:
+    """한 종목 이벤트들에서 **분기 순이익(3개월)** 시계열을 구성.
+
+    Q1~Q3는 보고서 thstrm(3개월)을 그대로, **Q4 = 연간(사업보고서) − (Q1+Q2+Q3)** 로 도출.
+    Q4 도출에 필요한 분기가 빠지면 해당 Q4는 생략(조용한 추정 금지).
+    반환: ``{(연도, 분기): 순이익_3개월}``.
+    """
+    from trading_engine.data.dart_provider import (
+        REPRT_HALF,
+        REPRT_Q1,
+        REPRT_Q3,
+    )
+
+    raw: dict[tuple[int, str], float] = {}
+    for ev in events:
+        ni = ev.figures.net_income
+        if ni is not None:
+            raw[(ev.bsns_year, ev.reprt_code)] = ni
+
+    out: dict[tuple[int, int], float] = {}
+    for (year, reprt), ni in raw.items():
+        q = quarter_of(reprt)
+        if q is None:
+            continue
+        if q < 4:
+            out[(year, q)] = ni  # thstrm = 당기 3개월
+        else:
+            parts = [raw.get((year, REPRT_Q1)), raw.get((year, REPRT_HALF)), raw.get((year, REPRT_Q3))]
+            if all(p is not None for p in parts):
+                out[(year, 4)] = ni - sum(parts)  # 연간 − 9개월 누적
+    return out
+
+
+def compute_sue_series(
+    ni_by_period: dict[tuple[int, int], float],
+    lookback: int = 8,
+    min_obs: int = 4,
+) -> dict[tuple[int, int], float]:
+    """분기 순이익 시계열 → 분기별 SUE (point-in-time).
+
+    계절 랜덤워크 기대: 기대이익 = 전년동기. UE = 당분기 − 전년동기.
+    SUE = UE / (직전 ``lookback`` 분기 UE의 표준편차). 표준편차는 **해당 분기 이전** UE만 사용
+    (룩어헤드 차단). 직전 UE가 ``min_obs`` 미만이면 SUE 미정의(생략).
+    """
+    import statistics
+
+    # 전년동기 대비 UE 계산
+    ue: dict[tuple[int, int], float] = {}
+    for (y, q), ni in ni_by_period.items():
+        prev = ni_by_period.get((y - 1, q))
+        if prev is not None:
+            ue[(y, q)] = ni - prev
+
+    ue_periods = sorted(ue)  # (연도,분기) 시간순
+    out: dict[tuple[int, int], float] = {}
+    for i, p in enumerate(ue_periods):
+        trailing = [ue[ue_periods[j]] for j in range(max(0, i - lookback), i)]  # p 이전만
+        if len(trailing) < min_obs:
+            continue
+        sd = statistics.stdev(trailing)
+        if sd > 0:
+            out[p] = ue[p] / sd
+    return out
+
+
+def attach_sue(events: list[EarningsEvent], lookback: int = 8, min_obs: int = 4) -> None:
+    """한 종목 이벤트 목록에 각 분기 SUE를 채운다(in-place)."""
+    ni = build_quarterly_ni(events)
+    sue_series = compute_sue_series(ni, lookback=lookback, min_obs=min_obs)
+    for ev in events:
+        q = quarter_of(ev.reprt_code)
+        if q is not None:
+            ev.sue = sue_series.get((ev.bsns_year, q))
 
 
 def first_filings_only(disclosures: pd.DataFrame) -> pd.DataFrame:

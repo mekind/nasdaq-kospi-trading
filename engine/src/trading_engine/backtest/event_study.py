@@ -176,6 +176,15 @@ def eps_yoy_signal(threshold: float = 0.20):
     return _fn
 
 
+def sue_signal(threshold: float = 1.0):
+    """SUE ≥ threshold 인 이벤트만 통과 (정통 PEAD: 표준화 기대외이익 서프라이즈)."""
+
+    def _fn(ev: EarningsEvent) -> bool:
+        return ev.sue is not None and ev.sue >= threshold
+
+    return _fn
+
+
 def growth_gap_signal(threshold: float = 0.20, growth_field: str = "eps"):
     """이익 성장률 − 주가 상승률 갭 ≥ threshold 인 이벤트만 통과.
 

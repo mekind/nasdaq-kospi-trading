@@ -19,10 +19,15 @@ import pytest
 from trading_engine.data import dart_provider as dp
 from trading_engine.data.earnings import (
     EarningsEvent,
+    FinancialFigures,
+    attach_sue,
     availability_date,
+    build_quarterly_ni,
+    compute_sue_series,
     extract_figures,
     first_filings_only,
     prior_field_for,
+    quarter_of,
     trailing_return,
     yoy,
 )
@@ -136,6 +141,72 @@ def test_trailing_return_insufficient():
     idx = pd.bdate_range("2022-01-03", periods=100)
     close = pd.Series(range(100, 200), index=idx, dtype=float)
     assert trailing_return(close, idx[50], lookback=252) is None
+
+
+# ── SUE (정통 PEAD 신호) ────────────────────────────────────────────────────
+def _ev_ni(year, reprt, ni):
+    return EarningsEvent(
+        stock_code="A", corp_code="C", rcept_no="R", rcept_dt=f"{year}0515",
+        bsns_year=year, reprt_code=reprt, is_amendment=False,
+        figures=FinancialFigures(net_income=ni),
+    )
+
+
+def test_quarter_of():
+    assert quarter_of(dp.REPRT_Q1) == 1
+    assert quarter_of(dp.REPRT_HALF) == 2
+    assert quarter_of(dp.REPRT_Q3) == 3
+    assert quarter_of(dp.REPRT_ANNUAL) == 4
+    assert quarter_of("99999") is None
+
+
+def test_build_quarterly_ni_derives_q4():
+    events = [
+        _ev_ni(2020, dp.REPRT_Q1, 10.0),
+        _ev_ni(2020, dp.REPRT_HALF, 12.0),
+        _ev_ni(2020, dp.REPRT_Q3, 11.0),
+        _ev_ni(2020, dp.REPRT_ANNUAL, 50.0),  # 연간
+    ]
+    ni = build_quarterly_ni(events)
+    assert ni[(2020, 1)] == 10.0
+    assert ni[(2020, 4)] == pytest.approx(50.0 - (10 + 12 + 11))  # 17
+
+
+def test_build_quarterly_ni_skips_q4_when_incomplete():
+    events = [
+        _ev_ni(2020, dp.REPRT_Q1, 10.0),
+        _ev_ni(2020, dp.REPRT_ANNUAL, 50.0),  # Q2,Q3 없음 → Q4 도출 불가
+    ]
+    ni = build_quarterly_ni(events)
+    assert (2020, 4) not in ni
+
+
+def test_compute_sue_series_pit():
+    import statistics
+
+    ni = {(y, 1): v for y, v in {
+        2010: 100, 2011: 105, 2012: 112, 2013: 120, 2014: 130, 2015: 142, 2016: 200,
+    }.items()}
+    sue = compute_sue_series(ni, lookback=8, min_obs=4)
+    # UE: 2011:5,2012:7,2013:8,2014:10,2015:12,2016:58
+    # (2016,1) 이전 UE 5개[5,7,8,10,12] → std로 표준화
+    expected = 58 / statistics.stdev([5, 7, 8, 10, 12])
+    assert sue[(2016, 1)] == pytest.approx(expected)
+    # 직전 UE가 4개 미만인 분기는 미정의
+    assert (2014, 1) not in sue  # 이전 UE 3개뿐
+    assert (2015, 1) in sue  # 이전 UE 4개
+
+
+def test_attach_sue_inplace():
+    # 한 분기(Q1) 시계열로 충분한 워밍업 후 마지막 이벤트에 SUE 부착
+    events = [_ev_ni(y, dp.REPRT_Q1, ni) for y, ni in [
+        (2010, 100), (2011, 105), (2012, 112), (2013, 120), (2014, 130), (2015, 142), (2016, 200),
+    ]]
+    attach_sue(events, lookback=8, min_obs=4)
+    last = [e for e in events if e.bsns_year == 2016][0]
+    assert last.sue is not None and last.sue > 0
+    # 워밍업 부족한 초기 분기는 None
+    assert [e for e in events if e.bsns_year == 2011][0].sue is None
 
 
 def test_prior_field_for():

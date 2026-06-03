@@ -17,6 +17,7 @@ from trading_engine.backtest.event_study import (
     eps_yoy_signal,
     growth_gap_signal,
     run_event_study,
+    sue_signal,
 )
 from trading_engine.data.earnings import EarningsEvent, FinancialFigures
 
@@ -169,6 +170,17 @@ def test_composite_yoy_signal_all_and_any():
 def test_composite_yoy_signal_bad_mode():
     with pytest.raises(ValueError):
         composite_yoy_signal((("eps", 0.2),), "xor")
+
+
+def test_sue_signal():
+    sig = sue_signal(1.0)
+    ev = _event_multi("A", {}, None)
+    ev.sue = 1.5
+    assert sig(ev) is True
+    ev.sue = 0.5
+    assert sig(ev) is False
+    ev.sue = None
+    assert sig(ev) is False
 
 
 def test_growth_gap_signal():
