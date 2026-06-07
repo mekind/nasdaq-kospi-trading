@@ -67,7 +67,9 @@ class AssetClassTrendFollowing:
         """
         monthly = self.month_end_rows(daily_close[self.assets])
         sma = monthly.rolling(self.sma_months).mean()
-        above = monthly > sma  # NaN(워밍업) → False
+        # 워밍업 구간(이력 < sma_months)은 SMA가 NaN → 비교 결과 False(의도된 동작).
+        # pandas에서 `값 > NaN`은 항상 False이므로 해당 월은 자동으로 미보유(현금)가 된다.
+        above = monthly > sma
 
         weights: dict[pd.Timestamp, dict[str, float]] = {}
         for ts in monthly.index:

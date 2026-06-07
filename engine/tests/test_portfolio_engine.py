@@ -135,6 +135,48 @@ def test_no_execution_on_last_bar():
     assert (res.equity_curve == 1000.0).all()
 
 
+def test_raises_on_misaligned_panels():
+    """opens/closes의 index 또는 columns가 어긋나면 ValueError로 조기 차단한다."""
+    d1 = pd.date_range("2020-01-01", periods=3, freq="D")
+    d2 = pd.date_range("2020-01-02", periods=3, freq="D")
+    eng = PortfolioBacktestEngine(initial_cash=1000.0, cost_model=NO_COST)
+    with pytest.raises(ValueError, match="index"):
+        eng.run(
+            pd.DataFrame({"A": [1, 2, 3]}, index=d1),
+            pd.DataFrame({"A": [1, 2, 3]}, index=d2),
+            {},
+        )
+    with pytest.raises(ValueError, match="columns"):
+        eng.run(
+            pd.DataFrame({"A": [1, 2, 3]}, index=d1),
+            pd.DataFrame({"B": [1, 2, 3]}, index=d1),
+            {},
+        )
+
+
+def test_raises_on_weights_exceeding_one():
+    """목표비중 합 > 1.0(레버리지) 또는 음수 비중은 ValueError."""
+    dates = pd.date_range("2020-01-01", periods=3, freq="D")
+    opens = pd.DataFrame({"A": [10, 10, 10], "B": [10, 10, 10]}, index=dates)
+    eng = PortfolioBacktestEngine(initial_cash=1000.0, cost_model=NO_COST)
+    with pytest.raises(ValueError, match="레버리지"):
+        eng.run(opens, opens.copy(), {dates[0]: {"A": 0.7, "B": 0.7}})
+    with pytest.raises(ValueError, match="음수"):
+        eng.run(opens, opens.copy(), {dates[0]: {"A": -0.5}})
+
+
+def test_full_investment_weights_allowed():
+    """비중 합이 정확히 1.0(부동소수 오차 포함)이면 허용된다."""
+    dates = pd.date_range("2020-01-01", periods=3, freq="D")
+    opens = pd.DataFrame(
+        {"A": [10, 10, 10], "B": [10, 10, 10], "C": [10, 10, 10]}, index=dates
+    )
+    eng = PortfolioBacktestEngine(initial_cash=1000.0, cost_model=NO_COST)
+    # 1/3 × 3 = 0.999...로 1.0 미세초과 가능 → 허용돼야 함.
+    res = eng.run(opens, opens.copy(), {dates[0]: {"A": 1 / 3, "B": 1 / 3, "C": 1 / 3}})
+    assert res.final_equity == pytest.approx(1000.0)
+
+
 def test_missing_price_asset_is_skipped():
     """시가가 NaN인 자산은 거래되지 않고 보유가 유지된다(다른 자산은 정상 체결)."""
     dates = pd.date_range("2020-01-01", periods=3, freq="D")

@@ -78,6 +78,19 @@ class PortfolioBacktestEngine:
         Returns:
             PortfolioBacktestResult.
         """
+        # ── 입력 정합 검증 (조용한 오정렬·레버리지 버그를 조기 차단) ─────────────
+        if not opens.index.equals(closes.index):
+            raise ValueError("opens/closes의 index(거래일)가 일치해야 합니다")
+        if list(opens.columns) != list(closes.columns):
+            raise ValueError("opens/closes의 columns(자산)가 일치해야 합니다")
+        for ts, w in target_weights.items():
+            if any(v < 0 for v in w.values()):
+                raise ValueError(f"음수 비중은 허용되지 않습니다(롱온리): {ts} → {w}")
+            if sum(w.values()) > 1.0 + 1e-9:
+                raise ValueError(
+                    f"비중 합이 1.0을 초과합니다(레버리지 불가): {ts} → 합={sum(w.values())}"
+                )
+
         cost = self.cost_model
         assets = list(opens.columns)
         index = opens.index
@@ -107,7 +120,11 @@ class PortfolioBacktestEngine:
                 total_cost = 0.0
                 n_pos = 0
 
-                for a in assets:
+                # 자산이 모두 소진(파산)된 비정상 상태에서는 목표수량 분모가 의미를 잃으므로
+                # 거래하지 않고 빈 리밸런싱으로 기록한다(방어적 — 정상 흐름에선 도달 불가).
+                tradable = equity_at_open > 0
+
+                for a in assets if tradable else []:
                     raw_open = float(row_open[a])
                     if pd.isna(raw_open) or raw_open <= 0.0:
                         continue  # 가격 없는 자산은 거래 불가(보유 유지).
